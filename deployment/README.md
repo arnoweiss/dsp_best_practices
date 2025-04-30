@@ -1,8 +1,6 @@
 # Best Practices on deploying DSP-Endpoints
 
-DSP spec states
-that [authorization](https://eclipse-dataspace-protocol-base.github.io/DataspaceProtocol/HEAD/#authorization) is
-optional. However, participants usually require their endpoints to be protected and publicly reachable. Clients (usually
+Participants usually require their endpoints to be protected and publicly reachable. Clients (usually
 Consumers) have an interest to automatically discover DSP-endpoints and infer knowledge about their expected behavior.
 For this, the metadata endpoint is particularly relevant because it hints to the Consumer what version of the DSP and
 profiles to expect allowing the Consumer to terminate the interaction early.
@@ -107,10 +105,12 @@ and differentiates them via subpaths. Two example configuration rules of such an
 
 To the public internet, the well-known metadata endpoint would (if running in the Participant Agent itself)
 be exposed to the public at`https://gateway.mycorp.com/dsp-participant-agent/.well-known/dspace-version` violating
-RFC8615. Dataspace Participants would be required to configure an additional redirect:
+RFC8615.
+
+Dataspace Participants could try to heal that divergence by configuring an additional redirect:
 
 3. `https://gateway.mycorp.com/.well-known/dspace-version` redirects to
-   `https://dsp-participant-agent.mycorp.com/well-known/dspace-version`
+   `https://dsp-participant-agent.mycorp.com/.well-known/dspace-version`
 
 The returned version endpoint information would be:
 
@@ -121,11 +121,6 @@ The returned version endpoint information would be:
       "version": "2025-1",
       "path": "/arbitrary/difference/between/domain/and/2025-1/endpoint/",
       "binding": "HTTPS"
-    },
-    {
-      "version": "2024-1",
-      "path": "/arbitrary/difference/between/domain/and/2024-1/endpoint/",
-      "binding": "HTTPS"
     }
   ]
 }
@@ -134,7 +129,22 @@ The returned version endpoint information would be:
 indicating paths that are relative to the domain of the URL this payload was served by. A client will assume that the
 `2025-1` endpoint is available at `https://gateway.mycorp.com/arbitrary/difference/between/domain/and/2025-1/endpoint/`
 which would be unavailable as the DSP-endpoints are registered with a first segment `dsp-participant-agent`. So
-configuring an additional redirect rule (see rule 3) is not feasible.
+configuring an additional redirect rule (see rule 3) is not enough but **has to be** accompanied by making the connector
+deployment aware of its location on the proxy. It has to be aware of that anyway because of the `callbackAddress`
+properties that are part of the Contract Negotiation and Transfer Process Protocols. This would change the version info
+like this:
+
+```json
+{
+  "protocolVersions": [
+    {
+      "version": "2025-1",
+      "path": "dsp-participant-agent/arbitrary/difference/between/domain/and/2025-1/endpoint/",
+      "binding": "HTTPS"
+    }
+  ]
+}
+```
 
 In that case, the did doc would be
 
@@ -156,6 +166,3 @@ with the `serviceEndpoint` internally redirecting to
 
 Exposing a separate microservice implementing the metadata endpoint or a static document are options too. Their API
 response would have to be aware of the Participant Agent's deployment on an API Gateway.
-
-### Scenario 4: Participant has multiple DSP-endpoints behind an API-Gateway
-
